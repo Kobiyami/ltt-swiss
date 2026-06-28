@@ -1,0 +1,51 @@
+{
+  "name": "ltt-swiss",
+  "version": "1.0.0",
+  "description": "LTTSwiss - Logiciel d'appariement Swiss FIDE",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "build": "vite build",
+    "electron": "electron .",
+    "dist": "vite build && electron-builder"
+  },
+  "build": {
+    "appId": "com.ltt-swiss.app",
+    "productName": "LTTSwiss",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.icns"
+    }
+  },
+  "dependencies": {
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.17.0",
+    "swiss-pairing-engine": "file:../swiss-pairing-engine"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.1.2",
+    "cross-env": "^10.1.0",
+    "electron": "^36.9.5",
+    "electron-builder": "^26.0.12",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12",
+    "wait-on": "^8.0.3"
+  }
+}
