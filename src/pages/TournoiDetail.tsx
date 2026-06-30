@@ -3,30 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Tournament, exportTRF, finalRanking } from 'swiss-pairing-engine'
 import type { RoundPairings, GameResultInput } from 'swiss-pairing-engine'
 import { loadTournament, saveTournament } from '../lib/storage'
-
-function deserializeTournament(state: any): Tournament {
-  const tournament = new Tournament(state.info, state.players)
-  tournament.currentRound = state.currentRound
-  tournament.roundPairings = state.roundPairings
-  tournament.standings = state.standings.map((s: any) => ({
-    ...s,
-    opponentsPlayed: new Set(s.opponentsPlayed),
-  }))
-  return tournament
-}
-
-function serializeTournament(tournament: Tournament): object {
-  return {
-    info: tournament.info,
-    players: tournament.players,
-    standings: tournament.standings.map(s => ({
-      ...s,
-      opponentsPlayed: Array.from(s.opponentsPlayed),
-    })),
-    roundPairings: tournament.roundPairings,
-    currentRound: tournament.currentRound,
-  }
-}
+import { useConfirm } from '../components/ConfirmDialog'
+import { serializeTournament, deserializeTournament } from '../lib/serialization'
 
 function AddPlayerForm({ onAdd }: { onAdd: (name: string, rating: number) => void }) {
   const [name, setName] = useState('')
@@ -72,6 +50,7 @@ export default function TournoiDetail() {
   const [results, setResults] = useState<Record<string, 'white' | 'black' | 'draw'>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const { confirm, dialog } = useConfirm()
 
   useEffect(() => {
     if (!id) return
@@ -209,20 +188,21 @@ export default function TournoiDetail() {
                       forceUpdate(n => n + 1)
                     }}
                   />
-                  <button
-                    onClick={() => {
-                      if (!confirm(`Retirer le joueur "${player.name}" de la liste ?`)) return
-                      t.players.splice(idx, 1)
-                      t.standings.splice(idx, 1)
-                      t.players = t.players.map((p, i) => ({ ...p, pairingNumber: i + 1 }))
-                      t.standings = t.standings.map((s, i) => ({ ...s, player: { ...s.player, pairingNumber: i + 1 } }))
-                      save()
-                      forceUpdate(n => n + 1)
-                    }}
-                    className="ml-auto text-red-400 hover:text-red-300 text-sm transition"
-                  >
-                    Supprimer
-                  </button>
+                 <button
+  onClick={() => {
+    confirm(`Retirer le joueur "${player.name}" de la liste ?`, () => {
+      t.players.splice(idx, 1)
+      t.standings.splice(idx, 1)
+      t.players = t.players.map((p, i) => ({ ...p, pairingNumber: i + 1 }))
+      t.standings = t.standings.map((s, i) => ({ ...s, player: { ...s.player, pairingNumber: i + 1 } }))
+      save()
+      forceUpdate(n => n + 1)
+    })
+  }}
+  className="ml-auto text-red-400 hover:text-red-300 text-sm transition"
+>
+  Supprimer
+</button>
                 </div>
               ))}
             </div>
@@ -239,6 +219,7 @@ export default function TournoiDetail() {
                 opponentsPlayed: new Set(),
                 hasHadBye: false,
                 floatHistory: [],
+                withdrawn: false,
               })
               save()
               forceUpdate(n => n + 1)
@@ -308,21 +289,55 @@ export default function TournoiDetail() {
                 <th className="py-2">Joueur</th>
                 <th className="py-2 text-right">ELO</th>
                 <th className="py-2 text-right">Points</th>
+                {!isComplete && <th className="py-2 w-8"></th>}
               </tr>
             </thead>
             <tbody>
               {ranked.map((s, i) => (
                 <tr key={s.player.id} className="border-b border-gray-800 hover:bg-gray-900 transition">
                   <td className="py-2 text-gray-500">{i + 1}</td>
-                  <td className="py-2 font-medium">{s.player.name}</td>
+                  <td className="py-2 font-medium flex items-center gap-2">
+  {s.player.name}
+  {s.withdrawn && <span className="text-xs bg-red-900 text-red-300 px-1.5 py-0.5 rounded">Retiré</span>}
+</td>
                   <td className="py-2 text-right text-gray-500">{s.player.rating}</td>
                   <td className="py-2 text-right font-bold text-yellow-400">{s.score}</td>
+                  {!isComplete && (
+        <td className="py-2 text-right">
+          {!s.withdrawn ? (
+            <button
+              onClick={() => {
+                confirm(`Retirer ${s.player.name} du tournoi ?`, () => {
+                t.withdrawPlayer(s.player.id)
+                save()
+                forceUpdate(n => n + 1)
+                })
+              }}
+              className="text-xs text-red-400 hover:text-red-300 transition"
+            >
+              Retirer
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                t.standings.find(st => st.player.id === s.player.id)!.withdrawn = false
+                save()
+                forceUpdate(n => n + 1)
+              }}
+              className="text-xs text-green-400 hover:text-green-300 transition"
+            >
+              Réintégrer
+            </button>
+          )}
+        </td>
+      )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </main>
+      {dialog}
     </div>
   )
 }

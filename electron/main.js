@@ -20,7 +20,11 @@ function createWindow() {
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
+    win.webContents.on('before-input-event', (_event, input) => {
+  if (input.key === 'F12') {
     win.webContents.openDevTools({ mode: 'detach' })
+  }
+})
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }

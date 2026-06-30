@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Tournament } from 'swiss-pairing-engine'
-import type { Player } from 'swiss-pairing-engine'
+import { useConfirm } from '../components/ConfirmDialog'
+import { serializeTournament } from '../lib/serialization'
 import { listTournaments, saveTournament, deleteTournament, createTournamentId, type SavedTournament } from '../lib/storage'
 
 export default function Tournois() {
@@ -12,48 +13,33 @@ export default function Tournois() {
   const [city, setCity] = useState('')
   const [rounds, setRounds] = useState(7)
   const [dateStart, setDateStart] = useState('')
-  const [players, setPlayers] = useState<{name: string, rating: string}[]>([
-  { name: '', rating: '' }
-])
-
+  const { confirm, dialog } = useConfirm()
+ 
   useEffect(() => {
     setTournois(listTournaments().sort((a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     ))
   }, [])
 
-  function handleCreate() {
-  const validPlayers: Player[] = players
-    .filter(p => p.name.trim())
-    .map((p, i) => ({
-      id: `p${i + 1}`,
-      name: p.name.trim(),
-      rating: parseInt(p.rating) || 1500,
-      pairingNumber: i + 1,
-    }))
-
-  if (validPlayers.length < 2) {
-    alert('Il faut au moins 2 joueurs')
-    return
-  }
-
+function handleCreate() {
   const id = createTournamentId()
   const tournament = new Tournament({
     name,
     city: city || undefined,
     dateStart: dateStart || undefined,
     totalRounds: rounds,
-  }, validPlayers)
+  }, [])
 
   saveTournament(id, name, serializeTournament(tournament))
   navigate(`/tournoi/${id}`)
 }
 
   function handleDelete(id: string, name: string) {
-  if (!confirm(`Supprimer le tournoi "${name}" ?`)) return
+  confirm(`Supprimer le tournoi "${name}" ?`, () => {
   deleteTournament(id)
   setTournois(prev => prev.filter(t => t.id !== id))
-}
+})
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -117,56 +103,7 @@ export default function Tournois() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">
-                Joueurs * (un par ligne : Nom, ELO)
-              </label>
-              <div className="space-y-2">
-  {players.map((p, i) => (
-    <div key={i} className="flex gap-2 items-center">
-      <input
-        className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white flex-1"
-        placeholder="Nom du joueur"
-        value={p.name}
-        onChange={e => {
-          const updated = [...players]
-          updated[i] = { ...p, name: e.target.value }
-          setPlayers(updated)
-        }}
-      />
-      <input
-        type="number"
-        className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white w-28"
-        placeholder="ELO"
-        value={p.rating}
-        onChange={e => {
-          const updated = [...players]
-          updated[i] = { ...p, rating: e.target.value }
-          setPlayers(updated)
-        }}
-      />
-      {players.length > 1 && (
-        <button
-          onClick={() => {
-  if (!confirm(`Retirer le joueur "${p.name || 'sans nom'}" de la liste ?`)) return
-  setPlayers(players.filter((_, j) => j !== i))
-}}
-          className="text-red-400 hover:text-red-300 px-2"
-        >
-          ✕
-        </button>
-      )}
-    </div>
-  ))}
-  <button
-    onClick={() => setPlayers([...players, { name: '', rating: '' }])}
-    className="text-yellow-400 hover:text-yellow-300 text-sm transition"
-  >
-    + Ajouter un joueur
-  </button>
-</div>
-            </div>
-
+            
             <div className="flex gap-3">
               <button
                 onClick={handleCreate}
@@ -220,19 +157,7 @@ export default function Tournois() {
           </div>
         )}
       </main>
+      {dialog}
     </div>
   )
-}
-
-function serializeTournament(tournament: Tournament): object {
-  return {
-    info: tournament.info,
-    players: tournament.players,
-    standings: tournament.standings.map(s => ({
-      ...s,
-      opponentsPlayed: Array.from(s.opponentsPlayed),
-    })),
-    roundPairings: tournament.roundPairings,
-    currentRound: tournament.currentRound,
-  }
 }
